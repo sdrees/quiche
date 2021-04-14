@@ -1,13 +1,12 @@
-// Copyright (C) 2018, Cloudflare, Inc.
-// Copyright (C) 2018, Alessandro Ghedini
+// Copyright (C) 2018-2019, Cloudflare, Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
 //
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
+//     * Redistributions of source code must retain the above copyright notice,
+//       this list of conditions and the following disclaimer.
 //
 //     * Redistributions in binary form must reproduce the above copyright
 //       notice, this list of conditions and the following disclaimer in the
@@ -32,11 +31,32 @@ pub fn rand_bytes(buf: &mut [u8]) {
 }
 
 pub fn rand_u8() -> u8 {
-    let mut buf: [u8; 1] = [0; 1];
+    let mut buf = [0; 1];
 
     rand_bytes(&mut buf);
 
     buf[0]
+}
+
+pub fn rand_u64() -> u64 {
+    let mut buf = [0; 8];
+
+    rand_bytes(&mut buf);
+
+    u64::from_ne_bytes(buf)
+}
+
+pub fn rand_u64_uniform(max: u64) -> u64 {
+    let chunk_size = u64::max_value() / max;
+    let end_of_last_chunk = chunk_size * max;
+
+    let mut r = rand_u64();
+
+    while r >= end_of_last_chunk {
+        r = rand_u64();
+    }
+
+    r / chunk_size
 }
 
 extern {

@@ -1,5 +1,4 @@
-// Copyright (C) 2018, Cloudflare, Inc.
-// Copyright (C) 2018, Alessandro Ghedini
+// Copyright (C) 2018-2019, Cloudflare, Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -25,6 +24,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -45,7 +45,7 @@
 
 #define LOCAL_CONN_ID_LEN 16
 
-#define MAX_DATAGRAM_SIZE 1452
+#define MAX_DATAGRAM_SIZE 1350
 
 #define MAX_TOKEN_LEN \
     sizeof("quiche") - 1 + \
@@ -95,7 +95,7 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
         }
 
         if (written < 0) {
-            fprintf(stderr, "failed to create packet: %ld\n", written);
+            fprintf(stderr, "failed to create packet: %zd\n", written);
             return;
         }
 
@@ -107,7 +107,7 @@ static void flush_egress(struct ev_loop *loop, struct conn_io *conn_io) {
             return;
         }
 
-        fprintf(stderr, "sent %lu bytes\n", sent);
+        fprintf(stderr, "sent %zd bytes\n", sent);
     }
 
     double t = quiche_conn_timeout_as_nanos(conn_io->conn) / 1e9f;
@@ -153,24 +153,31 @@ static bool validate_token(const uint8_t *token, size_t token_len,
     return true;
 }
 
-static struct conn_io *create_conn(uint8_t *odcid, size_t odcid_len) {
-    struct conn_io *conn_io = malloc(sizeof(*conn_io));
-    if (conn_io == NULL) {
-        fprintf(stderr, "failed to allocate connection IO\n");
-        return NULL;
-    }
-
+static uint8_t *gen_cid(uint8_t *cid, size_t cid_len) {
     int rng = open("/dev/urandom", O_RDONLY);
     if (rng < 0) {
         perror("failed to open /dev/urandom");
         return NULL;
     }
 
-    ssize_t rand_len = read(rng, conn_io->cid, LOCAL_CONN_ID_LEN);
+    ssize_t rand_len = read(rng, cid, cid_len);
     if (rand_len < 0) {
         perror("failed to create connection ID");
         return NULL;
     }
+
+    return cid;
+}
+
+static struct conn_io *create_conn(uint8_t *dcid, size_t dcid_len, uint8_t *odcid,
+                                   size_t odcid_len) {
+    struct conn_io *conn_io = malloc(sizeof(*conn_io));
+    if (conn_io == NULL) {
+        fprintf(stderr, "failed to allocate connection IO\n");
+        return NULL;
+    }
+
+    memcpy(conn_io->cid, dcid, LOCAL_CONN_ID_LEN);
 
     quiche_conn *conn = quiche_accept(conn_io->cid, LOCAL_CONN_ID_LEN,
                                       odcid, odcid_len, config);
@@ -237,13 +244,13 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                                     token, &token_len);
         if (rc < 0) {
             fprintf(stderr, "failed to parse header: %d\n", rc);
-            return;
+            continue;
         }
 
         HASH_FIND(hh, conns->h, dcid, dcid_len, conn_io);
 
         if (conn_io == NULL) {
-            if (version != QUICHE_VERSION_DRAFT17) {
+            if (!quiche_version_is_supported(version)) {
                 fprintf(stderr, "version negotiation\n");
 
                 ssize_t written = quiche_negotiate_version(scid, scid_len,
@@ -251,9 +258,9 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                                                            out, sizeof(out));
 
                 if (written < 0) {
-                    fprintf(stderr, "failed to create vneg packet: %ld\n",
+                    fprintf(stderr, "failed to create vneg packet: %zd\n",
                             written);
-                    return;
+                    continue;
                 }
 
                 ssize_t sent = sendto(conns->sock, out, written, 0,
@@ -261,11 +268,11 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                                       peer_addr_len);
                 if (sent != written) {
                     perror("failed to send");
-                    return;
+                    continue;
                 }
 
-                fprintf(stderr, "sent %lu bytes\n", sent);
-                return;
+                fprintf(stderr, "sent %zd bytes\n", sent);
+                continue;
             }
 
             if (token_len == 0) {
@@ -274,16 +281,22 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 mint_token(dcid, dcid_len, &peer_addr, peer_addr_len,
                            token, &token_len);
 
+                uint8_t new_cid[LOCAL_CONN_ID_LEN];
+
+                if (gen_cid(new_cid, LOCAL_CONN_ID_LEN) == NULL) {
+                    continue;
+                }
+
                 ssize_t written = quiche_retry(scid, scid_len,
                                                dcid, dcid_len,
-                                               dcid, dcid_len,
+                                               new_cid, LOCAL_CONN_ID_LEN,
                                                token, token_len,
-                                               out, sizeof(out));
+                                               version, out, sizeof(out));
 
                 if (written < 0) {
-                    fprintf(stderr, "failed to create retry packet: %ld\n",
+                    fprintf(stderr, "failed to create retry packet: %zd\n",
                             written);
-                    return;
+                    continue;
                 }
 
                 ssize_t sent = sendto(conns->sock, out, written, 0,
@@ -291,23 +304,23 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                                       peer_addr_len);
                 if (sent != written) {
                     perror("failed to send");
-                    return;
+                    continue;
                 }
 
-                fprintf(stderr, "sent %lu bytes\n", sent);
-                return;
+                fprintf(stderr, "sent %zd bytes\n", sent);
+                continue;
             }
 
 
             if (!validate_token(token, token_len, &peer_addr, peer_addr_len,
                                odcid, &odcid_len)) {
                 fprintf(stderr, "invalid address validation token\n");
-                return;
+                continue;
             }
 
-            conn_io = create_conn(odcid, odcid_len);
+            conn_io = create_conn(dcid, dcid_len, odcid, odcid_len);
             if (conn_io == NULL) {
-                return;
+                continue;
             }
 
             memcpy(&conn_io->peer_addr, &peer_addr, peer_addr_len);
@@ -316,25 +329,20 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
 
         ssize_t done = quiche_conn_recv(conn_io->conn, buf, read);
 
-        if (done == QUICHE_ERR_DONE) {
-            fprintf(stderr, "done reading\n");
-            break;
-        }
-
         if (done < 0) {
-            fprintf(stderr, "failed to process packet: %ld\n", done);
-            return;
+            fprintf(stderr, "failed to process packet: %zd\n", done);
+            continue;
         }
 
-        fprintf(stderr, "recv %lu bytes\n", done);
+        fprintf(stderr, "recv %zd bytes\n", done);
 
         if (quiche_conn_is_established(conn_io->conn)) {
             uint64_t s = 0;
 
-            quiche_readable *iter = quiche_conn_readable(conn_io->conn);
+            quiche_stream_iter *readable = quiche_conn_readable(conn_io->conn);
 
-            while (quiche_readable_next(iter, &s)) {
-                fprintf(stderr, "stream %zu is readable\n", s);
+            while (quiche_stream_iter_next(readable, &s)) {
+                fprintf(stderr, "stream %" PRIu64 " is readable\n", s);
 
                 bool fin = false;
                 ssize_t recv_len = quiche_conn_stream_recv(conn_io->conn, s,
@@ -351,7 +359,7 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
                 }
             }
 
-            quiche_readable_free(iter);
+            quiche_stream_iter_free(readable);
         }
     }
 
@@ -359,6 +367,12 @@ static void recv_cb(EV_P_ ev_io *w, int revents) {
         flush_egress(loop, conn_io);
 
         if (quiche_conn_is_closed(conn_io->conn)) {
+            quiche_stats stats;
+
+            quiche_conn_stats(conn_io->conn, &stats);
+            fprintf(stderr, "connection closed, recv=%zu sent=%zu lost=%zu rtt=%" PRIu64 "ns cwnd=%zu\n",
+                    stats.recv, stats.sent, stats.lost, stats.rtt, stats.cwnd);
+
             HASH_DELETE(hh, conns->h, conn_io);
 
             ev_timer_stop(loop, &conn_io->timer);
@@ -377,7 +391,11 @@ static void timeout_cb(EV_P_ ev_timer *w, int revents) {
     flush_egress(loop, conn_io);
 
     if (quiche_conn_is_closed(conn_io->conn)) {
-        fprintf(stderr, "connection closed\n");
+        quiche_stats stats;
+
+        quiche_conn_stats(conn_io->conn, &stats);
+        fprintf(stderr, "connection closed, recv=%zu sent=%zu lost=%zu rtt=%" PRIu64 "ns cwnd=%zu\n",
+                stats.recv, stats.sent, stats.lost, stats.rtt, stats.cwnd);
 
         HASH_DELETE(hh, conns->h, conn_io);
 
@@ -423,21 +441,26 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    config = quiche_config_new(QUICHE_VERSION_DRAFT17);
+    config = quiche_config_new(QUICHE_PROTOCOL_VERSION);
     if (config == NULL) {
         fprintf(stderr, "failed to create config\n");
         return -1;
     }
 
-    quiche_config_load_cert_chain_from_pem_file(config, "examples/cert.crt");
-    quiche_config_load_priv_key_from_pem_file(config, "examples/cert.key");
+    quiche_config_load_cert_chain_from_pem_file(config, "./cert.crt");
+    quiche_config_load_priv_key_from_pem_file(config, "./cert.key");
 
-    quiche_config_set_idle_timeout(config, 30);
-    quiche_config_set_max_packet_size(config, MAX_DATAGRAM_SIZE);
+    quiche_config_set_application_protos(config,
+        (uint8_t *) "\x05hq-29\x05hq-28\x05hq-27\x08http/0.9", 27);
+
+    quiche_config_set_max_idle_timeout(config, 5000);
+    quiche_config_set_max_recv_udp_payload_size(config, MAX_DATAGRAM_SIZE);
+    quiche_config_set_max_send_udp_payload_size(config, MAX_DATAGRAM_SIZE);
     quiche_config_set_initial_max_data(config, 10000000);
     quiche_config_set_initial_max_stream_data_bidi_local(config, 1000000);
     quiche_config_set_initial_max_stream_data_bidi_remote(config, 1000000);
     quiche_config_set_initial_max_streams_bidi(config, 100);
+    quiche_config_set_cc_algorithm(config, QUICHE_CC_RENO);
 
     struct connections c;
     c.sock = sock;

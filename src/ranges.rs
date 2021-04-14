@@ -1,13 +1,12 @@
-// Copyright (C) 2018, Cloudflare, Inc.
-// Copyright (C) 2018, Alessandro Ghedini
+// Copyright (C) 2018-2019, Cloudflare, Inc.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
 //
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
+//     * Redistributions of source code must retain the above copyright notice,
+//       this list of conditions and the following disclaimer.
 //
 //     * Redistributions in binary form must reproduce the above copyright
 //       notice, this list of conditions and the following disclaimer in the
@@ -27,16 +26,25 @@
 
 use std::ops::Range;
 
-use std::collections::Bound;
 use std::collections::btree_map;
 use std::collections::BTreeMap;
+use std::collections::Bound;
 
-#[derive(Clone, Default, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd)]
 pub struct RangeSet {
     inner: BTreeMap<u64, u64>,
+
+    capacity: usize,
 }
 
 impl RangeSet {
+    pub fn new(capacity: usize) -> Self {
+        RangeSet {
+            inner: BTreeMap::default(),
+            capacity,
+        }
+    }
+
     // TODO: use RangeInclusive
     pub fn insert(&mut self, item: Range<u64>) {
         let mut start = item.start;
@@ -56,7 +64,7 @@ impl RangeSet {
         // Check if following existing ranges overlap with the new one.
         while let Some(r) = self.next_to(start) {
             // Existing range is fully contained in the new range, remove it.
-            if range_contains(&item, r.start) && range_contains(&item, r.end) {
+            if item.contains(&r.start) && item.contains(&r.end) {
                 self.inner.remove(&r.start);
                 continue;
             }
@@ -73,14 +81,21 @@ impl RangeSet {
             end = std::cmp::max(end, r.end);
         }
 
+        if self.inner.len() >= self.capacity {
+            if let Some(first) = self.inner.keys().next().copied() {
+                self.inner.remove(&first);
+            }
+        }
+
         self.inner.insert(start, end);
     }
 
     pub fn remove_until(&mut self, largest: u64) {
-        let ranges: Vec<Range<u64>> =
-            self.inner.range((Bound::Unbounded, Bound::Included(&largest)))
-                      .map(|(&s, &e)| (s..e))
-                      .collect();
+        let ranges: Vec<Range<u64>> = self
+            .inner
+            .range((Bound::Unbounded, Bound::Included(&largest)))
+            .map(|(&s, &e)| (s..e))
+            .collect();
 
         for r in ranges {
             self.inner.remove(&r.start);
@@ -97,8 +112,16 @@ impl RangeSet {
         self.insert(item..item + 1);
     }
 
-    pub fn largest(&self) -> Option<u64> {
+    pub fn first(&self) -> Option<u64> {
+        self.flatten().next()
+    }
+
+    pub fn last(&self) -> Option<u64> {
         self.flatten().next_back()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
     }
 
     pub fn iter(&self) -> Iter {
@@ -116,22 +139,59 @@ impl RangeSet {
     }
 
     fn prev_to(&self, item: u64) -> Option<Range<u64>> {
-        self.inner.range((Bound::Unbounded, Bound::Included(item)))
-                  .map(|(&s, &e)| (s..e))
-                  .next_back()
+        self.inner
+            .range((Bound::Unbounded, Bound::Included(item)))
+            .map(|(&s, &e)| (s..e))
+            .next_back()
     }
 
     fn next_to(&self, item: u64) -> Option<Range<u64>> {
-        self.inner.range((Bound::Included(item), Bound::Unbounded))
-                  .map(|(&s, &e)| (s..e))
-                  .next()
+        self.inner
+            .range((Bound::Included(item), Bound::Unbounded))
+            .map(|(&s, &e)| (s..e))
+            .next()
+    }
+}
+
+impl Default for RangeSet {
+    fn default() -> Self {
+        Self::new(std::usize::MAX)
+    }
+}
+
+// This implements comparison between `RangeSet` and standard `Range`. The idea
+// is that a `RangeSet` with no gaps (i.e. that only contains a single range)
+// is basically equvalent to a normal `Range` so they should be comparable.
+impl PartialEq<Range<u64>> for RangeSet {
+    fn eq(&self, other: &Range<u64>) -> bool {
+        // If there is more than one range it means that the range set is not
+        // contiguous, so can't be equal to a single range.
+        if self.inner.len() != 1 {
+            return false;
+        }
+
+        // Get the first and only range in the set.
+        let (first_start, first_end) = self.inner.iter().next().unwrap();
+
+        if (*first_start..*first_end) != *other {
+            return false;
+        }
+
+        true
     }
 }
 
 impl std::fmt::Debug for RangeSet {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.iter().map(|mut r| { r.end -= 1; r })
-                                     .collect::<Vec<Range<u64>>>())
+        let ranges: Vec<Range<u64>> = self
+            .iter()
+            .map(|mut r| {
+                r.end -= 1;
+                r
+            })
+            .collect();
+
+        write!(f, "{:?}", ranges)
     }
 }
 
@@ -200,15 +260,10 @@ impl<'a> DoubleEndedIterator for Flatten<'a> {
     }
 }
 
-fn range_contains(r: &Range<u64>, item: u64) -> bool {
-    r.start <= item && item <= r.end
-}
-
 fn range_overlaps(r: &Range<u64>, other: &Range<u64>) -> bool {
     other.start >= r.start && other.start <= r.end ||
-    other.end >= r.start && other.end <= r.end
+        other.end >= r.start && other.end <= r.end
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -218,7 +273,8 @@ mod tests {
     fn insert_non_overlapping() {
         let mut r = RangeSet::default();
         assert_eq!(r.inner.len(), 0);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[]);
+        let empty: &[u64] = &[];
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &empty);
 
         r.insert(4..7);
         assert_eq!(r.inner.len(), 1);
@@ -268,28 +324,31 @@ mod tests {
 
         r.insert(5..7);
         assert_eq!(r.inner.len(), 2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 6, 9, 10, 11]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[3, 4, 5, 6, 9, 10, 11]);
 
         r.insert(10..15);
         assert_eq!(r.inner.len(), 2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 6, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 6, 9, 10, 11, 12, 13, 14
+        ]);
 
         r.insert(2..5);
         assert_eq!(r.inner.len(), 2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14
+        ]);
 
         r.insert(8..10);
         assert_eq!(r.inner.len(), 2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14
+        ]);
 
         r.insert(6..10);
         assert_eq!(r.inner.len(), 1);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+        ]);
     }
 
     #[test]
@@ -298,23 +357,27 @@ mod tests {
 
         r.insert(3..6);
         r.insert(16..20);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 16, 17, 18, 19
+        ]);
 
         r.insert(10..11);
         assert_eq!(r.inner.len(), 3);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 10, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 10, 16, 17, 18, 19
+        ]);
 
         r.insert(13..14);
         assert_eq!(r.inner.len(), 4);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 10, 13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 10, 13, 16, 17, 18, 19
+        ]);
 
         r.insert(4..17);
         assert_eq!(r.inner.len(), 1);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+        ]);
     }
 
     #[test]
@@ -356,44 +419,52 @@ mod tests {
 
         r.push_item(15);
         assert_eq!(r.inner.len(), 3);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[4, 5, 6, 9, 10, 11, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            4, 5, 6, 9, 10, 11, 15
+        ]);
 
         r.push_item(15);
         assert_eq!(r.inner.len(), 3);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[4, 5, 6, 9, 10, 11, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            4, 5, 6, 9, 10, 11, 15
+        ]);
 
         r.push_item(1);
         assert_eq!(r.inner.len(), 4);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[1, 4, 5, 6, 9, 10, 11, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            1, 4, 5, 6, 9, 10, 11, 15
+        ]);
 
         r.push_item(12);
         r.push_item(13);
         r.push_item(14);
         assert_eq!(r.inner.len(), 3);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[1, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            1, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15
+        ]);
 
         r.push_item(2);
         r.push_item(3);
         assert_eq!(r.inner.len(), 2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15
+        ]);
 
         r.push_item(8);
         r.push_item(7);
         assert_eq!(r.inner.len(), 1);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+        ]);
     }
 
     #[test]
     fn flatten_rev() {
         let mut r = RangeSet::default();
         assert_eq!(r.inner.len(), 0);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[]);
+
+        let empty: &[u64] = &[];
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &empty);
 
         r.insert(4..7);
         assert_eq!(r.inner.len(), 1);
@@ -403,15 +474,18 @@ mod tests {
         r.insert(9..12);
         assert_eq!(r.inner.len(), 2);
         assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[4, 5, 6, 9, 10, 11]);
-        assert_eq!(&r.flatten().rev().collect::<Vec<u64>>(),
-                   &[11, 10, 9, 6, 5, 4]);
+        assert_eq!(&r.flatten().rev().collect::<Vec<u64>>(), &[
+            11, 10, 9, 6, 5, 4
+        ]);
     }
 
     #[test]
     fn flatten_one() {
         let mut r = RangeSet::default();
         assert_eq!(r.inner.len(), 0);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[]);
+
+        let empty: &[u64] = &[];
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &empty);
 
         r.insert(0..1);
         assert_eq!(r.inner.len(), 1);
@@ -427,34 +501,114 @@ mod tests {
         r.insert(9..11);
         r.insert(13..14);
         r.insert(16..20);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 9, 10, 13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 9, 10, 13, 16, 17, 18, 19
+        ]);
 
         r.remove_until(2);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[3, 4, 5, 9, 10, 13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            3, 4, 5, 9, 10, 13, 16, 17, 18, 19
+        ]);
 
         r.remove_until(4);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[5, 9, 10, 13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            5, 9, 10, 13, 16, 17, 18, 19
+        ]);
 
         r.remove_until(6);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[9, 10, 13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[
+            9, 10, 13, 16, 17, 18, 19
+        ]);
 
         r.remove_until(10);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[13, 16, 17, 18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[13, 16, 17, 18, 19]);
 
         r.remove_until(17);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[18, 19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[18, 19]);
 
         r.remove_until(18);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(),
-                   &[19]);
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[19]);
 
         r.remove_until(20);
-        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &[]);
+
+        let empty: &[u64] = &[];
+        assert_eq!(&r.flatten().collect::<Vec<u64>>(), &empty);
+    }
+
+    #[test]
+    fn eq_range() {
+        let mut r = RangeSet::default();
+        assert_ne!(r, 0..0);
+
+        let expected = 3..20;
+
+        r.insert(3..6);
+        assert_ne!(r, expected);
+
+        r.insert(16..20);
+        assert_ne!(r, expected);
+
+        r.insert(10..11);
+        assert_ne!(r, expected);
+
+        r.insert(13..14);
+        assert_ne!(r, expected);
+
+        r.insert(4..17);
+        assert_eq!(r, expected);
+    }
+
+    #[test]
+    fn first_last() {
+        let mut r = RangeSet::default();
+        assert_eq!(r.first(), None);
+        assert_eq!(r.last(), None);
+
+        r.insert(10..11);
+        assert_eq!(r.first(), Some(10));
+        assert_eq!(r.last(), Some(10));
+
+        r.insert(13..14);
+        assert_eq!(r.first(), Some(10));
+        assert_eq!(r.last(), Some(13));
+
+        r.insert(3..6);
+        assert_eq!(r.first(), Some(3));
+        assert_eq!(r.last(), Some(13));
+
+        r.insert(16..20);
+        assert_eq!(r.first(), Some(3));
+        assert_eq!(r.last(), Some(19));
+
+        r.insert(4..17);
+        assert_eq!(r.first(), Some(3));
+        assert_eq!(r.last(), Some(19));
+    }
+
+    #[test]
+    fn capacity() {
+        let mut r = RangeSet::new(3);
+        assert_eq!(r.first(), None);
+        assert_eq!(r.last(), None);
+
+        r.insert(10..11);
+        assert_eq!(r.first(), Some(10));
+        assert_eq!(r.last(), Some(10));
+
+        r.insert(13..14);
+        assert_eq!(r.first(), Some(10));
+        assert_eq!(r.last(), Some(13));
+
+        r.insert(3..6);
+        assert_eq!(r.first(), Some(3));
+        assert_eq!(r.last(), Some(13));
+
+        r.insert(16..20);
+        assert_eq!(r.first(), Some(10));
+        assert_eq!(r.last(), Some(19));
+
+        r.insert(4..17);
+        assert_eq!(r.first(), Some(4));
+        assert_eq!(r.last(), Some(19));
     }
 }
