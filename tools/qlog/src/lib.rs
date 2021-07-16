@@ -92,8 +92,7 @@
 //!     Some("Example qlog trace".to_string()),
 //!     Some("Example qlog trace description".to_string()),
 //!     Some(qlog::Configuration {
-//!         time_offset: Some("0".to_string()),
-//!         time_units: Some(qlog::TimeUnits::Ms),
+//!         time_offset: Some(0.0),
 //!         original_uris: None,
 //!     }),
 //!     None,
@@ -123,8 +122,7 @@
 //! #     Some("Example qlog trace".to_string()),
 //! #     Some("Example qlog trace description".to_string()),
 //! #     Some(qlog::Configuration {
-//! #         time_offset: Some("0".to_string()),
-//! #         time_units: Some(qlog::TimeUnits::Ms),
+//! #         time_offset: Some(0.0),
 //! #         original_uris: None,
 //! #     }),
 //! #     None
@@ -142,8 +140,7 @@
 //!     Some(&dcid),
 //! );
 //!
-//! let frames =
-//!     vec![qlog::QuicFrame::crypto("0".to_string(), "1000".to_string())];
+//! let frames = vec![qlog::QuicFrame::crypto(0, 0)];
 //!
 //! let event = qlog::event::Event::packet_sent_min(
 //!     qlog::PacketType::Initial,
@@ -171,8 +168,7 @@
 //! #     Some("Example qlog trace".to_string()),
 //! #     Some("Example qlog trace description".to_string()),
 //! #     Some(qlog::Configuration {
-//! #         time_offset: Some("0".to_string()),
-//! #         time_units: Some(qlog::TimeUnits::Ms),
+//! #         time_offset: Some(0.0),
 //! #         original_uris: None,
 //! #     }),
 //! #     None
@@ -191,8 +187,7 @@
 //!   "title": "Example qlog trace",
 //!   "description": "Example qlog trace description",
 //!   "configuration": {
-//!     "time_units": "ms",
-//!     "time_offset": "0"
+//!     "time_offset": 0.0
 //!   },
 //!   "event_fields": [
 //!     "relative_time",
@@ -202,26 +197,26 @@
 //!   ],
 //!   "events": [
 //!     [
-//!       "0",
+//!       0,
 //!       "transport",
 //!       "packet_sent",
 //!       {
 //!         "packet_type": "initial",
 //!         "header": {
-//!           "packet_number": "0",
+//!           "packet_number": 0,
 //!           "packet_size": 1251,
 //!           "payload_length": 1224,
 //!           "version": "ff00001b",
-//!           "scil": "8",
-//!           "dcil": "8",
+//!           "scil": 8,
+//!           "dcil": 8,
 //!           "scid": "7e37e4dcc6682da8",
 //!           "dcid": "36ce104eee50101c"
 //!         },
 //!         "frames": [
 //!           {
 //!             "frame_type": "crypto",
-//!             "offset": "0",
-//!             "length": "100",
+//!             "offset": 0,
+//!             "length": 100,
 //!           }
 //!         ]
 //!       }
@@ -245,8 +240,7 @@
 //!     Some("Example qlog trace".to_string()),
 //!     Some("Example qlog trace description".to_string()),
 //!     Some(qlog::Configuration {
-//!         time_offset: Some("0".to_string()),
-//!         time_units: Some(qlog::TimeUnits::Ms),
+//!         time_offset: Some(0.0),
 //!         original_uris: None,
 //!     }),
 //!     None,
@@ -271,8 +265,7 @@
 //! #    Some("Example qlog trace".to_string()),
 //! #    Some("Example qlog trace description".to_string()),
 //! #    Some(qlog::Configuration {
-//! #        time_offset: Some("0".to_string()),
-//! #        time_units: Some(qlog::TimeUnits::Ms),
+//! #        time_offset: Some(0.0),
 //! #        original_uris: None,
 //! #    }),
 //! #    None,
@@ -306,8 +299,7 @@
 //! #    Some("Example qlog trace".to_string()),
 //! #    Some("Example qlog trace description".to_string()),
 //! #    Some(qlog::Configuration {
-//! #        time_offset: Some("0".to_string()),
-//! #        time_units: Some(qlog::TimeUnits::Ms),
+//! #        time_offset: Some(0.0),
 //! #        original_uris: None,
 //! #    }),
 //! #    None,
@@ -345,8 +337,7 @@
 //! #    Some("Example qlog trace".to_string()),
 //! #    Some("Example qlog trace description".to_string()),
 //! #    Some(qlog::Configuration {
-//! #        time_offset: Some("0".to_string()),
-//! #        time_units: Some(qlog::TimeUnits::Ms),
+//! #        time_offset: Some(0.0),
 //! #        original_uris: None,
 //! #    }),
 //! #    None,
@@ -395,8 +386,7 @@
 //! #    Some("Example qlog trace".to_string()),
 //! #    Some("Example qlog trace description".to_string()),
 //! #    Some(qlog::Configuration {
-//! #        time_offset: Some("0".to_string()),
-//! #        time_units: Some(qlog::TimeUnits::Ms),
+//! #        time_offset: Some(0.0),
 //! #        original_uris: None,
 //! #    }),
 //! #    None,
@@ -434,8 +424,7 @@
 //! #    Some("Example qlog trace".to_string()),
 //! #    Some("Example qlog trace description".to_string()),
 //! #    Some(qlog::Configuration {
-//! #        time_offset: Some("0".to_string()),
-//! #        time_units: Some(qlog::TimeUnits::Ms),
+//! #        time_offset: Some(0.0),
 //! #        original_uris: None,
 //! #    }),
 //! #    None,
@@ -660,7 +649,7 @@ impl QlogStreamer {
         Ok(())
     }
 
-    /// Writes a JSON-serialized `EventField`s.
+    /// Writes a JSON-serialized `EventField`s at `std::time::Instant::now()`.
     ///
     /// Some qlog events can contain `QuicFrames`. If this is detected `true` is
     /// returned and the streamer enters a frame-serialization mode that is only
@@ -669,27 +658,25 @@ impl QlogStreamer {
     ///
     /// If the event contains no array of `QuicFrames` return `false`.
     pub fn add_event(&mut self, event: event::Event) -> Result<bool> {
+        let now = std::time::Instant::now();
+
+        self.add_event_with_instant(event, now)
+    }
+
+    /// Writes a JSON-serialized `EventField`s with the provided instant.
+    ///
+    /// Some qlog events can contain `QuicFrames`. If this is detected `true` is
+    /// returned and the streamer enters a frame-serialization mode that is only
+    /// concluded by `finish_frames()`. In this mode, attempts to log additional
+    /// events are ignored.
+    ///
+    /// If the event contains no array of `QuicFrames` return `false`.
+    pub fn add_event_with_instant(
+        &mut self, event: event::Event, now: std::time::Instant,
+    ) -> Result<bool> {
         if self.state != StreamerState::Ready {
             return Err(Error::InvalidState);
         }
-
-        let event_time = if cfg!(test) {
-            std::time::Duration::from_secs(0)
-        } else {
-            self.start_time.elapsed()
-        };
-
-        let rel = match &self.qlog.traces[0].configuration {
-            Some(conf) => match conf.time_units {
-                Some(TimeUnits::Ms) => event_time.as_millis().to_string(),
-
-                Some(TimeUnits::Us) => event_time.as_micros().to_string(),
-
-                None => String::from(""),
-            },
-
-            None => String::from(""),
-        };
 
         let (ev_data, contains_frames) = match serde_json::to_string(&event.data)
         {
@@ -718,7 +705,14 @@ impl QlogStreamer {
 
         let maybe_terminate = if contains_frames { "" } else { "]" };
 
-        let ev_time = serde_json::to_string(&EventField::RelativeTime(rel)).ok();
+        let dur = if cfg!(test) {
+            std::time::Duration::from_secs(0)
+        } else {
+            now.duration_since(self.start_time)
+        };
+        let rel_time = dur.as_secs_f32() * 1000.0;
+        let rel_ev_time = EventField::RelativeTime(rel_time);
+        let ev_time = serde_json::to_string(&rel_ev_time).ok();
         let ev_cat =
             serde_json::to_string(&EventField::Category(event.category)).ok();
         let ev_ty = serde_json::to_string(&EventField::Event(event.ty)).ok();
@@ -838,26 +832,18 @@ impl Trace {
     pub fn push_event(
         &mut self, relative_time: std::time::Duration, event: crate::event::Event,
     ) {
-        let rel = match &self.configuration {
-            Some(conf) => match conf.time_units {
-                Some(TimeUnits::Ms) => relative_time.as_millis().to_string(),
-
-                Some(TimeUnits::Us) => relative_time.as_micros().to_string(),
-
-                None => String::from(""),
-            },
-
-            None => String::from(""),
-        };
+        let rel_ev_time = relative_time.as_secs_f32() * 1000.0;
 
         self.events.push(vec![
-            EventField::RelativeTime(rel),
+            EventField::RelativeTime(rel_ev_time),
             EventField::Category(event.category),
             EventField::Event(event.ty),
             EventField::Data(event.data),
         ]);
     }
 }
+
+pub type Bytes = String;
 
 #[serde_with::skip_serializing_none]
 #[derive(Serialize, Clone)]
@@ -889,8 +875,7 @@ pub enum TimeUnits {
 #[serde_with::skip_serializing_none]
 #[derive(Serialize, Clone)]
 pub struct Configuration {
-    pub time_units: Option<TimeUnits>,
-    pub time_offset: Option<String>,
+    pub time_offset: Option<f64>,
 
     pub original_uris: Option<Vec<String>>,
     /* TODO
@@ -900,8 +885,7 @@ pub struct Configuration {
 impl Default for Configuration {
     fn default() -> Self {
         Configuration {
-            time_units: Some(TimeUnits::Ms),
-            time_offset: Some("0".to_string()),
+            time_offset: Some(0.0),
             original_uris: None,
         }
     }
@@ -940,7 +924,7 @@ pub enum EventType {
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub enum EventField {
-    RelativeTime(String),
+    RelativeTime(f32),
 
     Category(EventCategory),
 
@@ -1211,8 +1195,8 @@ pub enum EventData {
     ServerListening {
         ip_v4: Option<String>,
         ip_v6: Option<String>,
-        port_v4: u64,
-        port_v6: u64,
+        port_v4: u32,
+        port_v6: u32,
 
         quic_versions: Option<Vec<String>>,
         alpn_values: Option<Vec<String>>,
@@ -1226,8 +1210,8 @@ pub enum EventData {
         dst_ip: String,
 
         protocol: Option<String>,
-        src_port: u64,
-        dst_port: u64,
+        src_port: u32,
+        dst_port: u32,
 
         quic_version: Option<String>,
         src_cid: Option<String>,
@@ -1235,11 +1219,11 @@ pub enum EventData {
     },
 
     ConnectionIdUpdated {
-        src_old: Option<String>,
-        src_new: Option<String>,
+        src_old: Option<Bytes>,
+        src_new: Option<Bytes>,
 
-        dst_old: Option<String>,
-        dst_new: Option<String>,
+        dst_old: Option<Bytes>,
+        dst_new: Option<Bytes>,
     },
 
     SpinBitUpdated {
@@ -1255,15 +1239,15 @@ pub enum EventData {
     // SECURITY
     KeyUpdated {
         key_type: KeyType,
-        old: Option<String>,
-        new: String,
-        generation: Option<u64>,
+        old: Option<Bytes>,
+        new: Bytes,
+        generation: Option<u32>,
     },
 
     KeyRetired {
         key_type: KeyType,
-        key: Option<String>,
-        generation: Option<u64>,
+        key: Option<Bytes>,
+        generation: Option<u32>,
     },
 
     // ================================================================== //
@@ -1277,33 +1261,33 @@ pub enum EventData {
         version: Option<String>,
         tls_cipher: Option<String>,
 
-        original_connection_id: Option<String>,
-        stateless_reset_token: Option<String>,
+        original_connection_id: Option<Bytes>,
+        stateless_reset_token: Option<Bytes>,
         disable_active_migration: Option<bool>,
 
         idle_timeout: Option<u64>,
-        max_packet_size: Option<u64>,
-        ack_delay_exponent: Option<u64>,
-        max_ack_delay: Option<u64>,
+        max_udp_payload_size: Option<u32>,
+        ack_delay_exponent: Option<u16>,
+        max_ack_delay: Option<u16>,
         active_connection_id_limit: Option<u64>,
 
-        initial_max_data: Option<String>,
-        initial_max_stream_data_bidi_local: Option<String>,
-        initial_max_stream_data_bidi_remote: Option<String>,
-        initial_max_stream_data_uni: Option<String>,
-        initial_max_streams_bidi: Option<String>,
-        initial_max_streams_uni: Option<String>,
+        initial_max_data: Option<u64>,
+        initial_max_stream_data_bidi_local: Option<u64>,
+        initial_max_stream_data_bidi_remote: Option<u64>,
+        initial_max_stream_data_uni: Option<u64>,
+        initial_max_streams_bidi: Option<u64>,
+        initial_max_streams_uni: Option<u64>,
 
         preferred_address: Option<PreferredAddress>,
     },
 
     DatagramsReceived {
-        count: Option<u64>,
+        count: Option<u16>,
         byte_length: Option<u64>,
     },
 
     DatagramsSent {
-        count: Option<u64>,
+        count: Option<u16>,
         byte_length: Option<u64>,
     },
 
@@ -1319,8 +1303,8 @@ pub enum EventData {
         // so we define it there and depend on serde's preserve_order feature.
         is_coalesced: Option<bool>,
 
-        raw_encrypted: Option<String>,
-        raw_decrypted: Option<String>,
+        raw_encrypted: Option<Bytes>,
+        raw_decrypted: Option<Bytes>,
         frames: Option<Vec<QuicFrame>>,
     },
 
@@ -1332,8 +1316,8 @@ pub enum EventData {
         // so we define it there and depend on serde's preserve_order feature.
         is_coalesced: Option<bool>,
 
-        raw_encrypted: Option<String>,
-        raw_decrypted: Option<String>,
+        raw_encrypted: Option<Bytes>,
+        raw_decrypted: Option<Bytes>,
         frames: Option<Vec<QuicFrame>>,
     },
 
@@ -1341,7 +1325,7 @@ pub enum EventData {
         packet_type: Option<PacketType>,
         packet_size: Option<u64>,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     PacketBuffered {
@@ -1350,7 +1334,7 @@ pub enum EventData {
     },
 
     StreamStateUpdated {
-        stream_id: String,
+        stream_id: u64,
         stream_type: Option<StreamType>,
 
         old: Option<StreamState>,
@@ -1366,26 +1350,26 @@ pub enum EventData {
     // ================================================================== //
     // RECOVERY
     RecoveryParametersSet {
-        reordering_threshold: Option<u64>,
-        time_threshold: Option<u64>,
-        timer_granularity: Option<u64>,
-        initial_rtt: Option<u64>,
+        reordering_threshold: Option<u16>,
+        time_threshold: Option<f32>,
+        timer_granularity: Option<u16>,
+        initial_rtt: Option<f32>,
 
-        max_datagram_size: Option<u64>,
+        max_datagram_size: Option<u32>,
         initial_congestion_window: Option<u64>,
-        minimum_congestion_window: Option<u64>,
-        loss_reduction_factor: Option<u64>,
-        persistent_congestion_threshold: Option<u64>,
+        minimum_congestion_window: Option<u32>,
+        loss_reduction_factor: Option<f32>,
+        persistent_congestion_threshold: Option<u16>,
     },
 
     MetricsUpdated {
-        min_rtt: Option<u64>,
-        smoothed_rtt: Option<u64>,
-        latest_rtt: Option<u64>,
-        rtt_variance: Option<u64>,
+        min_rtt: Option<f32>,
+        smoothed_rtt: Option<f32>,
+        latest_rtt: Option<f32>,
+        rtt_variance: Option<f32>,
 
         max_ack_delay: Option<u64>,
-        pto_count: Option<u64>,
+        pto_count: Option<u16>,
 
         congestion_window: Option<u64>,
         bytes_in_flight: Option<u64>,
@@ -1436,7 +1420,7 @@ pub enum EventData {
     },
 
     H3StreamTypeSet {
-        stream_id: String,
+        stream_id: u64,
         owner: Option<H3Owner>,
 
         old: Option<H3StreamType>,
@@ -1444,24 +1428,24 @@ pub enum EventData {
     },
 
     H3FrameCreated {
-        stream_id: String,
+        stream_id: u64,
         frame: Http3Frame,
-        byte_length: Option<String>,
+        byte_length: Option<u64>,
 
         raw: Option<String>,
     },
 
     H3FrameParsed {
-        stream_id: String,
+        stream_id: u64,
         frame: Http3Frame,
-        byte_length: Option<String>,
+        byte_length: Option<u64>,
 
         raw: Option<String>,
     },
 
     H3DataMoved {
-        stream_id: String,
-        offset: Option<String>,
+        stream_id: u64,
+        offset: Option<u64>,
         length: Option<u64>,
 
         from: Option<H3DataRecipient>,
@@ -1471,8 +1455,8 @@ pub enum EventData {
     },
 
     H3PushResolved {
-        push_id: Option<String>,
-        stream_id: Option<String>,
+        push_id: Option<u64>,
+        stream_id: Option<u64>,
 
         decision: Option<H3PushDecision>,
     },
@@ -1490,7 +1474,7 @@ pub enum EventData {
     },
 
     QpackStreamStateUpdated {
-        stream_id: String,
+        stream_id: u64,
 
         state: QpackStreamState,
     },
@@ -1502,39 +1486,39 @@ pub enum EventData {
     },
 
     QpackHeadersEncoded {
-        stream_id: Option<String>,
+        stream_id: Option<u64>,
 
         headers: Option<HttpHeader>,
 
         block_prefix: QpackHeaderBlockPrefix,
         header_block: Vec<QpackHeaderBlockRepresentation>,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     QpackHeadersDecoded {
-        stream_id: Option<String>,
+        stream_id: Option<u64>,
 
         headers: Option<HttpHeader>,
 
         block_prefix: QpackHeaderBlockPrefix,
         header_block: Vec<QpackHeaderBlockRepresentation>,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     QpackInstructionSent {
         instruction: QPackInstruction,
-        byte_length: Option<String>,
+        byte_length: Option<u32>,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     QpackInstructionReceived {
         instruction: QPackInstruction,
-        byte_length: Option<String>,
+        byte_length: Option<u32>,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     // ================================================================== //
@@ -1577,11 +1561,7 @@ impl EventData {
         match self {
             EventData::PacketSent { frames, .. } |
             EventData::PacketReceived { frames, .. } =>
-                if let Some(f) = frames {
-                    Some(f.len())
-                } else {
-                    None
-                },
+                frames.as_ref().map(|f| f.len()),
 
             EventData::PacketLost { frames, .. } |
             EventData::MarkedForRetransmit { frames } |
@@ -1664,14 +1644,14 @@ pub enum QuicFrameTypeName {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Serialize)]
 pub struct PacketHeader {
-    pub packet_number: String,
+    pub packet_number: u64,
     pub packet_size: Option<u64>,
     pub payload_length: Option<u64>,
     pub version: Option<String>,
-    pub scil: Option<String>,
-    pub dcil: Option<String>,
-    pub scid: Option<String>,
-    pub dcid: Option<String>,
+    pub scil: Option<u8>,
+    pub dcil: Option<u8>,
+    pub scid: Option<Bytes>,
+    pub dcid: Option<Bytes>,
 }
 
 impl PacketHeader {
@@ -1683,7 +1663,7 @@ impl PacketHeader {
     ) -> Self {
         let (scil, scid) = match scid {
             Some(cid) => (
-                Some(cid.len().to_string()),
+                Some(cid.len() as u8),
                 Some(format!("{}", HexSlice::new(&cid))),
             ),
 
@@ -1692,21 +1672,17 @@ impl PacketHeader {
 
         let (dcil, dcid) = match dcid {
             Some(cid) => (
-                Some(cid.len().to_string()),
+                Some(cid.len() as u8),
                 Some(format!("{}", HexSlice::new(&cid))),
             ),
 
             None => (None, None),
         };
 
-        let version = match version {
-            Some(v) => Some(format!("{:x?}", v)),
-
-            None => None,
-        };
+        let version = version.map(|v| format!("{:x?}", v));
 
         PacketHeader {
-            packet_number: packet_number.to_string(),
+            packet_number,
             packet_size,
             payload_length,
             version,
@@ -1852,33 +1828,33 @@ pub enum QuicFrame {
 
     Ack {
         frame_type: QuicFrameTypeName,
-        ack_delay: Option<String>,
+        ack_delay: Option<f32>,
         acked_ranges: Option<Vec<(u64, u64)>>,
 
-        ect1: Option<String>,
+        ect1: Option<u64>,
 
-        ect0: Option<String>,
+        ect0: Option<u64>,
 
-        ce: Option<String>,
+        ce: Option<u64>,
     },
 
     ResetStream {
         frame_type: QuicFrameTypeName,
-        stream_id: String,
+        stream_id: u64,
         error_code: u64,
-        final_size: String,
+        final_size: u64,
     },
 
     StopSending {
         frame_type: QuicFrameTypeName,
-        stream_id: String,
+        stream_id: u64,
         error_code: u64,
     },
 
     Crypto {
         frame_type: QuicFrameTypeName,
-        offset: String,
-        length: String,
+        offset: u64,
+        length: u64,
     },
 
     NewToken {
@@ -1889,52 +1865,52 @@ pub enum QuicFrame {
 
     Stream {
         frame_type: QuicFrameTypeName,
-        stream_id: String,
-        offset: String,
-        length: String,
+        stream_id: u64,
+        offset: u64,
+        length: u64,
         fin: bool,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     MaxData {
         frame_type: QuicFrameTypeName,
-        maximum: String,
+        maximum: u64,
     },
 
     MaxStreamData {
         frame_type: QuicFrameTypeName,
-        stream_id: String,
-        maximum: String,
+        stream_id: u64,
+        maximum: u64,
     },
 
     MaxStreams {
         frame_type: QuicFrameTypeName,
         stream_type: StreamType,
-        maximum: String,
+        maximum: u64,
     },
 
     DataBlocked {
         frame_type: QuicFrameTypeName,
-        limit: String,
+        limit: u64,
     },
 
     StreamDataBlocked {
         frame_type: QuicFrameTypeName,
-        stream_id: String,
-        limit: String,
+        stream_id: u64,
+        limit: u64,
     },
 
     StreamsBlocked {
         frame_type: QuicFrameTypeName,
         stream_type: StreamType,
-        limit: String,
+        limit: u64,
     },
 
     NewConnectionId {
         frame_type: QuicFrameTypeName,
-        sequence_number: String,
-        retire_prior_to: String,
+        sequence_number: u32,
+        retire_prior_to: u32,
         length: u64,
         connection_id: String,
         reset_token: String,
@@ -1942,29 +1918,29 @@ pub enum QuicFrame {
 
     RetireConnectionId {
         frame_type: QuicFrameTypeName,
-        sequence_number: String,
+        sequence_number: u32,
     },
 
     PathChallenge {
         frame_type: QuicFrameTypeName,
 
-        data: Option<String>,
+        data: Option<Bytes>,
     },
 
     PathResponse {
         frame_type: QuicFrameTypeName,
 
-        data: Option<String>,
+        data: Option<Bytes>,
     },
 
     ConnectionClose {
         frame_type: QuicFrameTypeName,
         error_space: ErrorSpace,
         error_code: u64,
-        raw_error_code: u64,
-        reason: String,
+        raw_error_code: Option<u64>,
+        reason: Option<String>,
 
-        trigger_frame_type: Option<String>,
+        trigger_frame_type: Option<u64>,
     },
 
     HandshakeDone {
@@ -1973,9 +1949,9 @@ pub enum QuicFrame {
 
     Datagram {
         frame_type: QuicFrameTypeName,
-        length: String,
+        length: u64,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     Unknown {
@@ -1998,8 +1974,8 @@ impl QuicFrame {
     }
 
     pub fn ack(
-        ack_delay: Option<String>, acked_ranges: Option<Vec<(u64, u64)>>,
-        ect1: Option<String>, ect0: Option<String>, ce: Option<String>,
+        ack_delay: Option<f32>, acked_ranges: Option<Vec<(u64, u64)>>,
+        ect1: Option<u64>, ect0: Option<u64>, ce: Option<u64>,
     ) -> Self {
         QuicFrame::Ack {
             frame_type: QuicFrameTypeName::Ack,
@@ -2012,7 +1988,7 @@ impl QuicFrame {
     }
 
     pub fn reset_stream(
-        stream_id: String, error_code: u64, final_size: String,
+        stream_id: u64, error_code: u64, final_size: u64,
     ) -> Self {
         QuicFrame::ResetStream {
             frame_type: QuicFrameTypeName::ResetStream,
@@ -2022,7 +1998,7 @@ impl QuicFrame {
         }
     }
 
-    pub fn stop_sending(stream_id: String, error_code: u64) -> Self {
+    pub fn stop_sending(stream_id: u64, error_code: u64) -> Self {
         QuicFrame::StopSending {
             frame_type: QuicFrameTypeName::StopSending,
             stream_id,
@@ -2030,7 +2006,7 @@ impl QuicFrame {
         }
     }
 
-    pub fn crypto(offset: String, length: String) -> Self {
+    pub fn crypto(offset: u64, length: u64) -> Self {
         QuicFrame::Crypto {
             frame_type: QuicFrameTypeName::Crypto,
             offset,
@@ -2047,8 +2023,7 @@ impl QuicFrame {
     }
 
     pub fn stream(
-        stream_id: String, offset: String, length: String, fin: bool,
-        raw: Option<String>,
+        stream_id: u64, offset: u64, length: u64, fin: bool, raw: Option<Bytes>,
     ) -> Self {
         QuicFrame::Stream {
             frame_type: QuicFrameTypeName::Stream,
@@ -2060,14 +2035,14 @@ impl QuicFrame {
         }
     }
 
-    pub fn max_data(maximum: String) -> Self {
+    pub fn max_data(maximum: u64) -> Self {
         QuicFrame::MaxData {
             frame_type: QuicFrameTypeName::MaxData,
             maximum,
         }
     }
 
-    pub fn max_stream_data(stream_id: String, maximum: String) -> Self {
+    pub fn max_stream_data(stream_id: u64, maximum: u64) -> Self {
         QuicFrame::MaxStreamData {
             frame_type: QuicFrameTypeName::MaxStreamData,
             stream_id,
@@ -2075,7 +2050,7 @@ impl QuicFrame {
         }
     }
 
-    pub fn max_streams(stream_type: StreamType, maximum: String) -> Self {
+    pub fn max_streams(stream_type: StreamType, maximum: u64) -> Self {
         QuicFrame::MaxStreams {
             frame_type: QuicFrameTypeName::MaxStreams,
             stream_type,
@@ -2083,14 +2058,14 @@ impl QuicFrame {
         }
     }
 
-    pub fn data_blocked(limit: String) -> Self {
+    pub fn data_blocked(limit: u64) -> Self {
         QuicFrame::DataBlocked {
             frame_type: QuicFrameTypeName::DataBlocked,
             limit,
         }
     }
 
-    pub fn stream_data_blocked(stream_id: String, limit: String) -> Self {
+    pub fn stream_data_blocked(stream_id: u64, limit: u64) -> Self {
         QuicFrame::StreamDataBlocked {
             frame_type: QuicFrameTypeName::StreamDataBlocked,
             stream_id,
@@ -2098,7 +2073,7 @@ impl QuicFrame {
         }
     }
 
-    pub fn streams_blocked(stream_type: StreamType, limit: String) -> Self {
+    pub fn streams_blocked(stream_type: StreamType, limit: u64) -> Self {
         QuicFrame::StreamsBlocked {
             frame_type: QuicFrameTypeName::StreamsBlocked,
             stream_type,
@@ -2107,7 +2082,7 @@ impl QuicFrame {
     }
 
     pub fn new_connection_id(
-        sequence_number: String, retire_prior_to: String, length: u64,
+        sequence_number: u32, retire_prior_to: u32, length: u64,
         connection_id: String, reset_token: String,
     ) -> Self {
         QuicFrame::NewConnectionId {
@@ -2120,21 +2095,21 @@ impl QuicFrame {
         }
     }
 
-    pub fn retire_connection_id(sequence_number: String) -> Self {
+    pub fn retire_connection_id(sequence_number: u32) -> Self {
         QuicFrame::RetireConnectionId {
             frame_type: QuicFrameTypeName::RetireConnectionId,
             sequence_number,
         }
     }
 
-    pub fn path_challenge(data: Option<String>) -> Self {
+    pub fn path_challenge(data: Option<Bytes>) -> Self {
         QuicFrame::PathChallenge {
             frame_type: QuicFrameTypeName::PathChallenge,
             data,
         }
     }
 
-    pub fn path_response(data: Option<String>) -> Self {
+    pub fn path_response(data: Option<Bytes>) -> Self {
         QuicFrame::PathResponse {
             frame_type: QuicFrameTypeName::PathResponse,
             data,
@@ -2142,8 +2117,8 @@ impl QuicFrame {
     }
 
     pub fn connection_close(
-        error_space: ErrorSpace, error_code: u64, raw_error_code: u64,
-        reason: String, trigger_frame_type: Option<String>,
+        error_space: ErrorSpace, error_code: u64, raw_error_code: Option<u64>,
+        reason: Option<String>, trigger_frame_type: Option<u64>,
     ) -> Self {
         QuicFrame::ConnectionClose {
             frame_type: QuicFrameTypeName::ConnectionClose,
@@ -2161,7 +2136,7 @@ impl QuicFrame {
         }
     }
 
-    pub fn datagram(length: String, raw: Option<String>) -> Self {
+    pub fn datagram(length: u64, raw: Option<Bytes>) -> Self {
         QuicFrame::Datagram {
             frame_type: QuicFrameTypeName::Datagram,
             length,
@@ -2210,7 +2185,7 @@ pub enum Http3Frame {
     Data {
         frame_type: Http3FrameTypeName,
 
-        raw: Option<String>,
+        raw: Option<Bytes>,
     },
 
     Headers {
@@ -2259,7 +2234,7 @@ pub enum Http3Frame {
 }
 
 impl Http3Frame {
-    pub fn data(raw: Option<String>) -> Self {
+    pub fn data(raw: Option<Bytes>) -> Self {
         Http3Frame::Data {
             frame_type: Http3FrameTypeName::Data,
             raw,
@@ -2471,11 +2446,7 @@ impl<'a> HexSlice<'a> {
     where
         T: ?Sized + AsRef<[u8]> + 'a,
     {
-        match data {
-            Some(d) => Some(format!("{}", HexSlice::new(d))),
-
-            None => None,
-        }
+        data.map(|d| format!("{}", HexSlice::new(d)))
     }
 }
 
@@ -2516,8 +2487,7 @@ pub mod testing {
             Some("Quiche qlog trace".to_string()),
             Some("Quiche qlog trace description".to_string()),
             Some(Configuration {
-                time_offset: Some("0".to_string()),
-                time_units: Some(TimeUnits::Ms),
+                time_offset: Some(0.0),
                 original_uris: None,
             }),
             None,
@@ -2535,12 +2505,12 @@ mod tests {
         let pkt_hdr = make_pkt_hdr();
 
         let log_string = r#"{
-  "packet_number": "0",
+  "packet_number": 0,
   "packet_size": 1251,
   "payload_length": 1224,
   "version": "ff000018",
-  "scil": "8",
-  "dcil": "8",
+  "scil": 8,
+  "dcil": 8,
   "scid": "7e37e4dcc6682da8",
   "dcid": "36ce104eee50101c"
 }"#;
@@ -2553,12 +2523,12 @@ mod tests {
         let log_string = r#"{
   "packet_type": "initial",
   "header": {
-    "packet_number": "0",
+    "packet_number": 0,
     "packet_size": 1251,
     "payload_length": 1224,
     "version": "ff00001b",
-    "scil": "8",
-    "dcil": "8",
+    "scil": 8,
+    "dcil": 8,
     "scid": "7e37e4dcc6682da8",
     "dcid": "36ce104eee50101c"
   }
@@ -2595,12 +2565,12 @@ mod tests {
         let log_string = r#"{
   "packet_type": "initial",
   "header": {
-    "packet_number": "0",
+    "packet_number": 0,
     "packet_size": 1251,
     "payload_length": 1224,
     "version": "ff000018",
-    "scil": "8",
-    "dcil": "8",
+    "scil": 8,
+    "dcil": 8,
     "scid": "7e37e4dcc6682da8",
     "dcid": "36ce104eee50101c"
   },
@@ -2613,9 +2583,9 @@ mod tests {
     },
     {
       "frame_type": "stream",
-      "stream_id": "0",
-      "offset": "0",
-      "length": "100",
+      "stream_id": 0,
+      "offset": 0,
+      "length": 100,
       "fin": true
     }
   ]
@@ -2628,13 +2598,7 @@ mod tests {
 
         frames.push(QuicFrame::ping());
 
-        frames.push(QuicFrame::stream(
-            "0".to_string(),
-            "0".to_string(),
-            "100".to_string(),
-            true,
-            None,
-        ));
+        frames.push(QuicFrame::stream(0, 0, 100, true, None));
 
         let pkt_sent_evt = EventData::PacketSent {
             raw_encrypted: None,
@@ -2660,8 +2624,7 @@ mod tests {
   "title": "Quiche qlog trace",
   "description": "Quiche qlog trace description",
   "configuration": {
-    "time_units": "ms",
-    "time_offset": "0"
+    "time_offset": 0.0
   },
   "event_fields": [
     "relative_time",
@@ -2686,8 +2649,7 @@ mod tests {
   "title": "Quiche qlog trace",
   "description": "Quiche qlog trace description",
   "configuration": {
-    "time_units": "ms",
-    "time_offset": "0"
+    "time_offset": 0.0
   },
   "event_fields": [
     "relative_time",
@@ -2697,27 +2659,27 @@ mod tests {
   ],
   "events": [
     [
-      "0",
+      0.0,
       "transport",
       "packet_sent",
       {
         "packet_type": "initial",
         "header": {
-          "packet_number": "0",
+          "packet_number": 0,
           "packet_size": 1251,
           "payload_length": 1224,
           "version": "ff000018",
-          "scil": "8",
-          "dcil": "8",
+          "scil": 8,
+          "dcil": 8,
           "scid": "7e37e4dcc6682da8",
           "dcid": "36ce104eee50101c"
         },
         "frames": [
           {
             "frame_type": "stream",
-            "stream_id": "0",
-            "offset": "0",
-            "length": "100",
+            "stream_id": 0,
+            "offset": 0,
+            "length": 100,
             "fin": true
           }
         ]
@@ -2730,13 +2692,7 @@ mod tests {
 
         let pkt_hdr = make_pkt_hdr();
 
-        let frames = vec![QuicFrame::stream(
-            "0".to_string(),
-            "0".to_string(),
-            "100".to_string(),
-            true,
-            None,
-        )];
+        let frames = vec![QuicFrame::stream(0, 0, 100, true, None)];
         let event = event::Event::packet_sent_min(
             PacketType::Initial,
             pkt_hdr,
@@ -2821,13 +2777,7 @@ mod tests {
         let mut trace = make_trace();
         let pkt_hdr = make_pkt_hdr();
 
-        let frame1 = QuicFrame::stream(
-            "40".to_string(),
-            "40".to_string(),
-            "400".to_string(),
-            true,
-            None,
-        );
+        let frame1 = QuicFrame::stream(40, 40, 400, true, None);
 
         let event1 = event::Event::packet_sent_min(
             PacketType::Handshake,
@@ -2837,21 +2787,9 @@ mod tests {
 
         trace.push_event(std::time::Duration::new(0, 0), event1);
 
-        let frame2 = QuicFrame::stream(
-            "0".to_string(),
-            "0".to_string(),
-            "100".to_string(),
-            true,
-            None,
-        );
+        let frame2 = QuicFrame::stream(0, 0, 100, true, None);
 
-        let frame3 = QuicFrame::stream(
-            "0".to_string(),
-            "0".to_string(),
-            "100".to_string(),
-            true,
-            None,
-        );
+        let frame3 = QuicFrame::stream(0, 0, 100, true, None);
 
         let event2 = event::Event::packet_sent_min(
             PacketType::Initial,
@@ -2951,6 +2889,24 @@ mod tests {
             _ => false,
         });
 
+        // Adding an event with an external time should work too.
+        // For tests, it will resolve to 0 but we care about proving the API
+        // here, not timing specifics.
+        let now = std::time::Instant::now();
+
+        assert!(match s.add_event_with_instant(event3.clone(), now) {
+            Ok(true) => true,
+            _ => false,
+        });
+        assert!(match s.add_frame(frame3.clone(), false) {
+            Ok(()) => true,
+            _ => false,
+        });
+        assert!(match s.finish_frames() {
+            Ok(()) => true,
+            _ => false,
+        });
+
         assert!(match s.finish_log() {
             Ok(()) => true,
             _ => false,
@@ -2959,7 +2915,7 @@ mod tests {
         let r = s.writer();
         let w: &Box<std::io::Cursor<Vec<u8>>> = unsafe { std::mem::transmute(r) };
 
-        let log_string = r#"{"qlog_version":"version","title":"title","description":"description","traces":[{"vantage_point":{"type":"server"},"title":"Quiche qlog trace","description":"Quiche qlog trace description","configuration":{"time_units":"ms","time_offset":"0"},"event_fields":["relative_time","category","event","data"],"events":[["0","transport","packet_sent",{"packet_type":"handshake","header":{"packet_number":"0","packet_size":1251,"payload_length":1224,"version":"ff000018","scil":"8","dcil":"8","scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"frames":[{"frame_type":"stream","stream_id":"40","offset":"40","length":"400","fin":true}]}],["0","transport","packet_sent",{"packet_type":"initial","header":{"packet_number":"0","packet_size":1251,"payload_length":1224,"version":"ff000018","scil":"8","dcil":"8","scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"frames":[{"frame_type":"stream","stream_id":"0","offset":"0","length":"100","fin":true}]}],["0","transport","packet_sent",{"packet_type":"initial","header":{"packet_number":"0","packet_size":1251,"payload_length":1224,"version":"ff000018","scil":"8","dcil":"8","scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"raw_encrypted":"encrypted_foo","raw_decrypted":"decrypted_foo","frames":[{"frame_type":"stream","stream_id":"0","offset":"0","length":"100","fin":true}]}]]}]}"#;
+        let log_string = r#"{"qlog_version":"version","title":"title","description":"description","traces":[{"vantage_point":{"type":"server"},"title":"Quiche qlog trace","description":"Quiche qlog trace description","configuration":{"time_offset":0.0},"event_fields":["relative_time","category","event","data"],"events":[[0.0,"transport","packet_sent",{"packet_type":"handshake","header":{"packet_number":0,"packet_size":1251,"payload_length":1224,"version":"ff000018","scil":8,"dcil":8,"scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"frames":[{"frame_type":"stream","stream_id":40,"offset":40,"length":400,"fin":true}]}],[0.0,"transport","packet_sent",{"packet_type":"initial","header":{"packet_number":0,"packet_size":1251,"payload_length":1224,"version":"ff000018","scil":8,"dcil":8,"scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"frames":[{"frame_type":"stream","stream_id":0,"offset":0,"length":100,"fin":true}]}],[0.0,"transport","packet_sent",{"packet_type":"initial","header":{"packet_number":0,"packet_size":1251,"payload_length":1224,"version":"ff000018","scil":8,"dcil":8,"scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"raw_encrypted":"encrypted_foo","raw_decrypted":"decrypted_foo","frames":[{"frame_type":"stream","stream_id":0,"offset":0,"length":100,"fin":true}]}],[0.0,"transport","packet_sent",{"packet_type":"initial","header":{"packet_number":0,"packet_size":1251,"payload_length":1224,"version":"ff000018","scil":8,"dcil":8,"scid":"7e37e4dcc6682da8","dcid":"36ce104eee50101c"},"raw_encrypted":"encrypted_foo","raw_decrypted":"decrypted_foo","frames":[{"frame_type":"stream","stream_id":0,"offset":0,"length":100,"fin":true}]}]]}]}"#;
 
         let written_string = std::str::from_utf8(w.as_ref().get_ref()).unwrap();
 
